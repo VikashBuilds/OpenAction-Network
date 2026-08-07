@@ -19,7 +19,7 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: matrix
         run: echo "matrix=$(node scripts/agent-matrix.mjs)" >> "$GITHUB_OUTPUT"
 
