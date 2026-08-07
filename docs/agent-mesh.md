@@ -35,4 +35,4 @@ The workflow accepts no arbitrary URL. It may invoke only agent/source assignmen
 
 When a candidate is approved, add its collector configuration and tests first, then assign it to exactly one scout in both the roster and `ops/agent-mesh.json`. Start it daily, inspect its snapshots and change quality, then increase its cadence only when it proves useful.
 
-The initial three approved assignments are Startup India, National Scholarship Portal, and myScheme. The remaining seven agents are operational roles awaiting approved sources; this is intentional and visible rather than fabricated coverage.
+The initial network contains ten approved official source assignments spanning Startup India, the Ministry of MSME, National Scholarship Portal, the Ministry of Education, National Career Service, myScheme, and the National Portal of India. Each must retain a successful collection history before it is treated as a reliable live source.

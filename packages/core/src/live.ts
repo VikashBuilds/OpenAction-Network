@@ -5,8 +5,15 @@ export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 export const officialSourceRegistry: Source[] = [
   { id: "startup-india", name: "Startup India Government Schemes", publisher: "Department for Promotion of Industry and Internal Trade", canonicalUrl: "https://www.startupindia.gov.in/content/sih/en/government-schemes.html", audience: ["business"], refreshHours: 24 },
+  { id: "msme-schemes", name: "MSME Schemes and Services", publisher: "Ministry of Micro, Small and Medium Enterprises", canonicalUrl: "https://www.msme.gov.in/offerings", audience: ["business"], refreshHours: 12 },
+  { id: "msme-notices", name: "MSME Notices and Updates", publisher: "Ministry of Micro, Small and Medium Enterprises", canonicalUrl: "https://www.msme.gov.in/whats-new", audience: ["business"], refreshHours: 12 },
   { id: "national-scholarship-portal", name: "National Scholarship Portal", publisher: "Ministry of Electronics and Information Technology", canonicalUrl: "https://scholarships.gov.in/", audience: ["student"], refreshHours: 24 },
-  { id: "myscheme", name: "myScheme", publisher: "Government of India", canonicalUrl: "https://www.myscheme.gov.in/", audience: ["citizen", "business", "student"], refreshHours: 24 }
+  { id: "education-scholarships", name: "Education Ministry Scholarships and Fellowships", publisher: "Department of Higher Education, Ministry of Education", canonicalUrl: "https://www.education.gov.in/scholarship-and-fellowships-students", audience: ["student"], refreshHours: 24 },
+  { id: "education-loans", name: "Education Ministry Scholarships and Education Loans", publisher: "Department of Higher Education, Ministry of Education", canonicalUrl: "https://www.education.gov.in/scholarships-education-loan-0", audience: ["student"], refreshHours: 24 },
+  { id: "ncs", name: "National Career Service Opportunities", publisher: "Ministry of Labour and Employment", canonicalUrl: "https://www.ncs.gov.in/", audience: ["student", "citizen"], refreshHours: 12 },
+  { id: "myscheme", name: "myScheme", publisher: "Government of India", canonicalUrl: "https://www.myscheme.gov.in/", audience: ["citizen", "business", "student"], refreshHours: 24 },
+  { id: "india-gov-schemes", name: "National Portal Government Schemes", publisher: "National Portal of India", canonicalUrl: "https://www.india.gov.in/my-government/schemes", audience: ["citizen", "business", "student"], refreshHours: 24 },
+  { id: "india-gov-spotlight", name: "National Portal Scheme Spotlight", publisher: "National Portal of India", canonicalUrl: "https://www.india.gov.in/", audience: ["citizen", "business", "student"], refreshHours: 24 }
 ];
 
 function htmlToText(html: string): string {

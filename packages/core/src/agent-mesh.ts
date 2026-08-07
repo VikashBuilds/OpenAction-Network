@@ -38,15 +38,15 @@ export interface CandidateAssessment {
 /** Each agent has bounded responsibility and no agent can publish an action. */
 export const agentMeshRoster: AgentDefinition[] = [
   { id: "business-opportunity-scout", name: "Business Opportunity Scout", lane: "MSME and Startup", capabilities: ["discover", "extract"], audience: ["business"], approvedSourceIds: ["startup-india"], cadence: "every_4_hours", publishAuthority: false },
-  { id: "procurement-scout", name: "Procurement Scout", lane: "Public procurement", capabilities: ["discover", "verify"], audience: ["business"], approvedSourceIds: [], cadence: "daily", publishAuthority: false },
-  { id: "compliance-deadline-scout", name: "Compliance and Deadline Scout", lane: "Business deadlines", capabilities: ["discover", "detect_change"], audience: ["business"], approvedSourceIds: [], cadence: "daily", publishAuthority: false },
+  { id: "procurement-scout", name: "Procurement Scout", lane: "Public procurement", capabilities: ["discover", "verify", "extract"], audience: ["business"], approvedSourceIds: ["msme-schemes"], cadence: "every_4_hours", publishAuthority: false },
+  { id: "compliance-deadline-scout", name: "Compliance and Deadline Scout", lane: "Business deadlines", capabilities: ["discover", "detect_change", "extract"], audience: ["business"], approvedSourceIds: ["msme-notices"], cadence: "every_4_hours", publishAuthority: false },
   { id: "student-opportunity-scout", name: "Student Opportunity Scout", lane: "Scholarships and education", capabilities: ["discover", "extract"], audience: ["student"], approvedSourceIds: ["national-scholarship-portal"], cadence: "every_4_hours", publishAuthority: false },
-  { id: "skills-career-scout", name: "Skills and Career Scout", lane: "Public skills and careers", capabilities: ["discover", "verify"], audience: ["student", "citizen"], approvedSourceIds: [], cadence: "daily", publishAuthority: false },
+  { id: "skills-career-scout", name: "Skills and Career Scout", lane: "Public skills and careers", capabilities: ["discover", "verify", "extract"], audience: ["student", "citizen"], approvedSourceIds: ["ncs"], cadence: "every_4_hours", publishAuthority: false },
   { id: "citizen-services-scout", name: "Citizen Services Scout", lane: "Schemes and services", capabilities: ["discover", "extract"], audience: ["citizen", "business", "student"], approvedSourceIds: ["myscheme"], cadence: "every_4_hours", publishAuthority: false },
-  { id: "state-portal-scout", name: "State Portal Scout", lane: "State government", capabilities: ["discover", "verify"], audience: ["business", "student", "citizen"], approvedSourceIds: [], cadence: "weekly", publishAuthority: false },
-  { id: "source-verifier", name: "Source Verifier", lane: "Authority and access", capabilities: ["verify"], audience: ["business", "student", "citizen"], approvedSourceIds: [], cadence: "on_change", publishAuthority: false },
-  { id: "evidence-quality-agent", name: "Evidence Quality Agent", lane: "Conflicts and duplicates", capabilities: ["deduplicate", "quality_review"], audience: ["business", "student", "citizen"], approvedSourceIds: [], cadence: "on_change", publishAuthority: false },
-  { id: "change-watch-agent", name: "Change Watch Agent", lane: "High-impact updates", capabilities: ["detect_change", "quality_review"], audience: ["business", "student", "citizen"], approvedSourceIds: [], cadence: "on_change", publishAuthority: false }
+  { id: "state-portal-scout", name: "State Portal Scout", lane: "State government", capabilities: ["discover", "verify", "extract"], audience: ["business", "student", "citizen"], approvedSourceIds: ["india-gov-schemes"], cadence: "every_4_hours", publishAuthority: false },
+  { id: "source-verifier", name: "Source Verifier", lane: "Authority and access", capabilities: ["verify", "extract"], audience: ["student"], approvedSourceIds: ["education-scholarships"], cadence: "daily", publishAuthority: false },
+  { id: "evidence-quality-agent", name: "Evidence Quality Agent", lane: "Conflicts and duplicates", capabilities: ["deduplicate", "quality_review", "extract"], audience: ["student"], approvedSourceIds: ["education-loans"], cadence: "daily", publishAuthority: false },
+  { id: "change-watch-agent", name: "Change Watch Agent", lane: "High-impact updates", capabilities: ["detect_change", "quality_review", "extract"], audience: ["business", "student", "citizen"], approvedSourceIds: ["india-gov-spotlight"], cadence: "every_4_hours", publishAuthority: false }
 ];
 
 function isHttpsPublicUrl(value: string): boolean {

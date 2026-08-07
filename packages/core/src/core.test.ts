@@ -90,7 +90,7 @@ describe("evidence pipeline", () => {
     });
     expect(assessment.decision).toBe("rejected");
     expect(assessment.reasons.join(" ")).toContain("Login");
-    expect(activeAgentAssignments(officialSourceRegistry)).toHaveLength(3);
+    expect(activeAgentAssignments(officialSourceRegistry)).toHaveLength(10);
   });
 
   it("creates versioned vector records and rejects incomplete embeddings", () => {
