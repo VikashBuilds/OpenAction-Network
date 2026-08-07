@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "policy": "Only approved source assignments run automatically. Candidate sources require human review before appearing here.",
+  "agents": [
+    { "id": "business-opportunity-scout", "approvedSourceIds": ["startup-india"] },
+    { "id": "procurement-scout", "approvedSourceIds": [] },
+    { "id": "compliance-deadline-scout", "approvedSourceIds": [] },
+    { "id": "student-opportunity-scout", "approvedSourceIds": ["national-scholarship-portal"] },
+    { "id": "skills-career-scout", "approvedSourceIds": [] },
+    { "id": "citizen-services-scout", "approvedSourceIds": ["myscheme"] },
+    { "id": "state-portal-scout", "approvedSourceIds": [] },
+    { "id": "source-verifier", "approvedSourceIds": [] },
+    { "id": "evidence-quality-agent", "approvedSourceIds": [] },
+    { "id": "change-watch-agent", "approvedSourceIds": [] }
+  ]
+}

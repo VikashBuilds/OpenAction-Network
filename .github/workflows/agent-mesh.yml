@@ -1,0 +1,48 @@
+name: OpenAction agent mesh
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Avoid the top of the hour: scheduled Actions can be delayed at peak times.
+    - cron: "17 */4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openaction-agent-mesh
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: matrix
+        run: echo "matrix=$(node scripts/agent-matrix.mjs)" >> "$GITHUB_OUTPUT"
+
+  request-approved-collections:
+    needs: plan
+    if: ${{ fromJSON(needs.plan.outputs.matrix).include[0] }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      OPENACTION_INGEST_URL: ${{ secrets.OPENACTION_INGEST_URL }}
+      OPENACTION_GITHUB_INGEST_TOKEN: ${{ secrets.OPENACTION_GITHUB_INGEST_TOKEN }}
+    steps:
+      - name: Require Cloudflare ingestion configuration
+        if: ${{ env.OPENACTION_INGEST_URL == '' || env.OPENACTION_GITHUB_INGEST_TOKEN == '' }}
+        run: |
+          echo "Set OPENACTION_INGEST_URL and OPENACTION_GITHUB_INGEST_TOKEN as repository Actions secrets."
+          exit 1
+      - name: Ask Cloudflare to collect source-backed evidence
+        run: |
+          curl --fail-with-body --retry 3 --retry-all-errors --connect-timeout 15 --max-time 45 \
+            -X POST "$OPENACTION_INGEST_URL/v1/ingest/github" \
+            -H "Authorization: Bearer $OPENACTION_GITHUB_INGEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"agentId":"${{ matrix.agentId }}","sourceId":"${{ matrix.sourceId }}"}'

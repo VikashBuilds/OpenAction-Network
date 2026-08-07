@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openaction-api",
+  "main": "src/index.ts",
+  "workers_dev": true,
+  "compatibility_date": "2026-07-26",
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["0 */6 * * *"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "openaction" }
+  ],
+  "r2_buckets": [
+    { "binding": "SNAPSHOTS", "bucket_name": "openaction-snapshots" }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "INGEST_QUEUE", "queue": "openaction-ingest" }
+    ],
+    "consumers": [
+      {
+        "queue": "openaction-ingest",
+        "max_batch_size": 10,
+        "max_batch_timeout": 30,
+        "max_retries": 5,
+        "dead_letter_queue": "openaction-ingest-dlq"
+      }
+    ]
+  },
+  "vectorize": [
+    { "binding": "VECTOR_INDEX", "index_name": "openaction-evidence" }
+  ],
+  "ai": { "binding": "AI" },
+  "vars": {
+    "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5"
+  },
+  "workflows": [
+    { "binding": "INGEST_WORKFLOW", "name": "openaction-ingest", "class_name": "OpenActionIngestWorkflow" }
+  ]
+}
