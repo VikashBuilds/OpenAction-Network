@@ -21,6 +21,7 @@ export interface DiscoveredSourceCandidate {
 }
 
 const relevantLinkTerms = /\b(scheme|scholarship|fellowship|grant|fund|benefit|service|career|job|skill|tender|procurement|startup|msme|apply|notification|programme|program)\b/i;
+const directDocumentExtension = /\.(?:pdf|docx?|xlsx?|csv|zip)$/i;
 
 function toPlainText(value: string): string {
   return value.replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim();
@@ -28,6 +29,30 @@ function toPlainText(value: string): string {
 
 function isPotentialOfficialHost(host: string): boolean {
   return host.endsWith(".gov.in") || host.endsWith(".nic.in") || host === "india.gov.in" || host.endsWith(".india.gov.in");
+}
+
+function isBareUrlLabel(label: string): boolean {
+  try {
+    const parsed = new URL(label.trim());
+    return parsed.protocol === "https:" && parsed.toString().replace(/\/$/, "") === label.trim().replace(/\/$/, "");
+  } catch {
+    return false;
+  }
+}
+
+function hasOnlyPastYears(label: string, now: Date): boolean {
+  const years = [...label.matchAll(/\b(20\d{2})\b/g)].map((match) => Number(match[1]));
+  return years.length > 0 && Math.max(...years) < now.getUTCFullYear();
+}
+
+function canonicalizeCandidateUrl(target: URL): string {
+  target.hash = "";
+  target.username = "";
+  target.password = "";
+  // Some public pages contain a visually invisible trailing encoded space in hrefs.
+  // It produces a different URL without pointing to a different public resource.
+  target.pathname = target.pathname.replace(/(?:%20|\s)+$/i, "") || "/";
+  return target.toString();
 }
 
 function candidateId(url: string): string {
@@ -85,12 +110,12 @@ export async function discoverSourceCandidates(bindings: SourceScoutBindings, ag
   for (const anchor of html.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)) {
     const label = toPlainText(anchor[3] ?? "");
     const href = anchor[2];
-    if (!href || !label || !relevantLinkTerms.test(label)) continue;
+    if (!href || !label || !relevantLinkTerms.test(label) || isBareUrlLabel(label) || hasOnlyPastYears(label, now)) continue;
     let target: URL;
     try { target = new URL(href, seedUrl); } catch { continue; }
-    if (target.protocol !== "https:" || target.host === seedUrl.host || !isPotentialOfficialHost(target.host)) continue;
-    target.hash = "";
-    unique.set(target.toString(), { canonicalUrl: target.toString(), name: label.slice(0, 180), host: target.host });
+    if (target.protocol !== "https:" || target.hostname === seedUrl.hostname || !isPotentialOfficialHost(target.hostname) || directDocumentExtension.test(target.pathname)) continue;
+    const canonicalUrl = canonicalizeCandidateUrl(target);
+    unique.set(canonicalUrl, { canonicalUrl, name: label.slice(0, 180), host: target.hostname });
     if (unique.size >= 40) break;
   }
   const candidates = [...unique.values()];
