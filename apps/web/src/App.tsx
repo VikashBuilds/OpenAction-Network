@@ -49,6 +49,18 @@ interface OfficialResource {
   notice: string;
 }
 
+interface AgentFinding {
+  id: string;
+  agentId: string;
+  sourceId: string;
+  sourceName: string;
+  publisher: string;
+  canonicalUrl: string;
+  signals: Array<{ title: string; evidence: string }>;
+  createdAt: string;
+  notice: string;
+}
+
 function loadProfile(): Profile {
   try {
     const saved = localStorage.getItem(storageKey);
@@ -72,6 +84,8 @@ export function App() {
   const [sourceHealthError, setSourceHealthError] = useState("");
   const [resources, setResources] = useState<OfficialResource[] | null>(null);
   const [resourceError, setResourceError] = useState("");
+  const [agentFindings, setAgentFindings] = useState<AgentFinding[] | null>(null);
+  const [agentFindingsError, setAgentFindingsError] = useState("");
   const [reportSource, setReportSource] = useState<SourceHealth | null>(null);
 
   useEffect(() => { void buildDemoCatalog().then(setCatalog); }, []);
@@ -104,6 +118,22 @@ export function App() {
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setResourceError("Official resources could not be loaded right now.");
+      });
+    return () => controller.abort();
+  }, [profile.audience]);
+  useEffect(() => {
+    if (!apiBaseUrl) return;
+    const controller = new AbortController();
+    setAgentFindings(null);
+    void fetch(`${apiBaseUrl}/v1/agent-findings?audience=${encodeURIComponent(profile.audience)}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The agent evidence feed is unavailable.");
+        return response.json() as Promise<{ findings?: AgentFinding[] }>;
+      })
+      .then((payload) => setAgentFindings(payload.findings ?? []))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setAgentFindingsError("Agent-selected evidence could not be loaded right now.");
       });
     return () => controller.abort();
   }, [profile.audience]);
@@ -203,6 +233,10 @@ export function App() {
       <section className="resource-shelf" aria-labelledby="resource-shelf-title">
         <div className="resource-shelf-heading"><div><p className="eyebrow">OFFICIAL RESOURCE SHELF</p><h2 id="resource-shelf-title">Explore verified public links.</h2><p>These are source-discovered official resources, not eligibility decisions or personalised recommendations.</p></div><span>{resources === null ? "LOADING" : `${resources.length} LINKS`}</span></div>
         {resources === null ? <div className="resource-empty">{resourceError || "Looking for official programme and service links…"}</div> : resources.length === 0 ? <div className="resource-empty">No relevant official links are available for this context yet.</div> : <div className="resource-list">{resources.slice(0, 8).map((resource) => <article key={resource.id} className="resource-card"><span>{resource.sourceName}</span><h3>{resource.title}</h3><p>Checked {new Date(resource.retrievedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</p><a href={resource.canonicalUrl} target="_blank" rel="noreferrer">Open official resource</a></article>)}</div>}
+      </section>
+      <section className="agent-desk" aria-labelledby="agent-desk-title">
+        <div className="agent-desk-heading"><div><p className="eyebrow">AI EVIDENCE DESK</p><h2 id="agent-desk-title">What the agents found in official material.</h2><p>Every displayed signal includes an exact excerpt from a collected source. These are discovery cues, never automatic eligibility decisions.</p></div><span>{agentFindings === null ? "ANALYSING" : `${agentFindings.length} AGENT REPORTS`}</span></div>
+        {agentFindings === null ? <div className="agent-desk-empty">{agentFindingsError || "Checking the latest source-grounded agent reportsâ€¦"}</div> : agentFindings.length === 0 ? <div className="agent-desk-empty">No validated AI evidence signals are available for this context yet.</div> : <div className="agent-report-list">{agentFindings.slice(0, 6).map((finding) => <article key={finding.id} className="agent-report"><div><span>{finding.agentId.replaceAll("-", " ")}</span><a href={finding.canonicalUrl} target="_blank" rel="noreferrer">{finding.sourceName} â†—</a></div>{finding.signals.slice(0, 3).map((signal) => <section key={`${finding.id}-${signal.evidence}`}><h3>{signal.title}</h3><blockquote>â€œ{signal.evidence}â€</blockquote></section>)}<small>Analysed {new Date(finding.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</small></article>)}</div>}
       </section>
       <div className="action-grid">
         {actions.length ? actions.map((action) => <ActionCard key={action.id} action={action} />) : <div className="empty"><h3>No verified actions yet</h3><p>Try a different profile context while more source connectors are added.</p></div>}

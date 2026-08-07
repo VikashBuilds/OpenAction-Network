@@ -37,6 +37,7 @@ pnpm --filter @openaction/worker dev
 | `GET /health` | Fixture-runtime health status |
 | `GET /v1/catalog` | Sources, snapshots, and available opportunities |
 | `GET /v1/agent-mesh` | Agent roles and their approved source assignments |
+| `GET /v1/agent-findings` | AI-selected, exact-excerpt evidence signals from monitored official sources |
 | `POST /v1/match` | Deterministically match a local profile to actions |
 | `GET /v1/changes` | Persisted, source-backed document changes after D1 is configured |
 | `POST /v1/ask` | Evidence-only answer with citations; lexical fallback until Vectorize is configured |
