@@ -6,3 +6,4 @@ export * from "./retrieval";
 export * from "./live";
 export * from "./changes";
 export * from "./agent-mesh";
+export * from "./live-opportunities";

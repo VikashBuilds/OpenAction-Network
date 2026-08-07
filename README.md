@@ -39,6 +39,7 @@ pnpm --filter @openaction/worker dev
 | `GET /v1/agent-mesh` | Agent roles and their approved source assignments |
 | `GET /v1/agent-findings` | AI-selected, exact-excerpt evidence signals from monitored official sources |
 | `GET /v1/source-candidates` | AI-assisted, human-review-only official-source leads |
+| `GET /v1/actions?audience=business` | Source-backed live resource leads for an audience; never an eligibility decision |
 | `POST /v1/match` | Deterministically match a local profile to actions |
 | `GET /v1/changes` | Persisted, source-backed document changes after D1 is configured |
 | `POST /v1/ask` | Evidence-only answer with citations; lexical fallback until Vectorize is configured |

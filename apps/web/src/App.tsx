@@ -74,6 +74,12 @@ interface SourceCandidate {
   createdAt: string;
 }
 
+interface ActionFeed {
+  actions?: Action[];
+  mode?: "live_resource_leads" | "fixture_fallback";
+  informationalNotice?: string;
+}
+
 function loadProfile(): Profile {
   try {
     const saved = localStorage.getItem(storageKey);
@@ -101,10 +107,29 @@ export function App() {
   const [agentFindingsError, setAgentFindingsError] = useState("");
   const [sourceCandidates, setSourceCandidates] = useState<SourceCandidate[] | null>(null);
   const [sourceCandidatesError, setSourceCandidatesError] = useState("");
+  const [liveActions, setLiveActions] = useState<Action[] | null>(null);
+  const [liveActionsError, setLiveActionsError] = useState("");
   const [reportSource, setReportSource] = useState<SourceHealth | null>(null);
 
   useEffect(() => { void buildDemoCatalog().then(setCatalog); }, []);
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(profile)); }, [profile]);
+  useEffect(() => {
+    if (!apiBaseUrl) return;
+    const controller = new AbortController();
+    setLiveActions(null);
+    setLiveActionsError("");
+    void fetch(`${apiBaseUrl}/v1/actions?audience=${encodeURIComponent(profile.audience)}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The live action feed is unavailable.");
+        return response.json() as Promise<ActionFeed>;
+      })
+      .then((payload) => setLiveActions(payload.actions ?? []))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setLiveActionsError("Live action leads could not be loaded right now.");
+      });
+    return () => controller.abort();
+  }, [profile.audience]);
   useEffect(() => {
     if (!apiBaseUrl) return;
     const controller = new AbortController();
@@ -183,7 +208,8 @@ export function App() {
     return () => controller.abort();
   }, []);
 
-  const actions = useMemo<Action[]>(() => catalog?.actions[profile.audience] ?? [], [catalog, profile.audience]);
+  const previewActions = useMemo<Action[]>(() => catalog?.actions[profile.audience] ?? [], [catalog, profile.audience]);
+  const actions = liveActions ?? (apiBaseUrl ? [] : previewActions);
   const audience = audienceLabels[profile.audience];
   const freshSources = catalog?.snapshots.filter((item) => item.status === "ready").length ?? 0;
   const liveFreshSources = sourceHealth?.filter((source) => source.freshness === "fresh").length;
@@ -272,9 +298,10 @@ export function App() {
         <div className="source-frontier-heading"><div><p className="eyebrow">SOURCE FRONTIER</p><h2 id="source-frontier-title">New official-source leads, held for review.</h2><p>The scout finds public-domain candidates from trusted sources. Nothing is automatically scraped or published from this queue.</p></div><span>{sourceCandidates === null ? "SCOUTING" : `${sourceCandidates.length} LEADS`}</span></div>
         {sourceCandidates === null ? <div className="source-frontier-empty">{sourceCandidatesError || "Loading the source-scout review queueâ€¦"}</div> : sourceCandidates.length === 0 ? <div className="source-frontier-empty">No new source candidates are waiting for review.</div> : <div className="source-frontier-list">{sourceCandidates.slice(0, 8).map((candidate) => <article key={candidate.id} className="source-candidate"><div><span>{candidate.score}/100 RELEVANCE</span><small>Found by {candidate.agentId.replaceAll("-", " ")}</small></div><h3>{candidate.name}</h3><p>{candidate.host}</p><a href={candidate.canonicalUrl} target="_blank" rel="noreferrer">Inspect candidate source â†—</a><small className="candidate-review">Awaiting authority, terms, and access review</small></article>)}</div>}
       </section>
-      <div className="action-grid">
-        {actions.length ? actions.map((action) => <ActionCard key={action.id} action={action} />) : <div className="empty"><h3>No verified actions yet</h3><p>Try a different profile context while more source connectors are added.</p></div>}
-      </div>
+      <section className="live-action-radar" aria-labelledby="live-action-radar-title">
+        <div className="live-action-heading"><div><p className="eyebrow">LIVE ACTION RADAR</p><h2 id="live-action-radar-title">Official leads for your selected context.</h2><p>These cards are created from official links already found by monitored sources. They are leads, never eligibility decisions.</p></div><span>{liveActions === null ? (apiBaseUrl ? "SYNCING" : "LOCAL PREVIEW") : `${liveActions.length} LIVE LEADS`}</span></div>
+        {liveActions === null && apiBaseUrl ? <div className="live-action-empty">{liveActionsError || "Loading source-backed action leads…"}</div> : <div className="action-grid">{actions.length ? actions.map((action) => <ActionCard key={action.id} action={action} />) : <div className="empty"><h3>No verified action leads yet</h3><p>More official resources will appear as the monitored sources are collected and reviewed.</p></div>}</div>}
+      </section>
       <section className="ask-panel" aria-labelledby="ask-title">
         <div><p className="eyebrow">ASK OPENACTION</p><h2 id="ask-title">Explore the evidence.</h2><p>Ask a question in plain English. Answers stay tied to retrieved official source material.</p></div>
         <form onSubmit={askOpenAction}>

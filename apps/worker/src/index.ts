@@ -1,4 +1,4 @@
-import { activeAgentAssignments, agentMeshRoster, answerFromEvidence, createActions, LocalEvidenceRetriever, officialSourceRegistry, type Audience, type DocumentChunk, type Profile } from "@openaction/core";
+import { activeAgentAssignments, agentMeshRoster, answerFromEvidence, createActions, LocalEvidenceRetriever, officialSourceRegistry, type Action, type Audience, type DocumentChunk, type Opportunity, type Profile, type Requirement } from "@openaction/core";
 import { buildDemoCatalog, demoProfiles } from "@openaction/core/fixtures";
 import { decideReview, type EvidenceBindings, type ReviewDecision } from "./persistence";
 import type { RagBindings } from "./vectorize";
@@ -62,6 +62,57 @@ function actionsForProfile(profile: Profile, catalog: Awaited<ReturnType<typeof 
   const effectiveProfile = { ...base, ...profile, facts: { ...base.facts, ...profile.facts } };
   const sourceMap = new Map(catalog.sources.map((source) => [source.id, source]));
   return createActions(catalog.opportunities, effectiveProfile, sourceMap, catalog.snapshots[0]?.retrievedAt ?? new Date().toISOString());
+}
+
+const opportunityKinds = new Set<Opportunity["kind"]>(["scheme", "tender", "deadline", "scholarship", "service"]);
+const requirementOperators = new Set<Requirement["operator"]>(["equals", "in", "gte", "lte", "truthy"]);
+
+function parseRequirements(value: unknown): Requirement[] {
+  if (typeof value !== "string") return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const requirement = item as Partial<Requirement>;
+      return typeof requirement.field === "string" && typeof requirement.label === "string" && requirementOperators.has(requirement.operator as Requirement["operator"])
+        ? [{ field: requirement.field, operator: requirement.operator as Requirement["operator"], value: requirement.value, label: requirement.label }]
+        : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function liveActionsForProfile(db: D1Database | undefined, profile: Profile): Promise<Action[]> {
+  if (!db) return [];
+  const result = await db.prepare("SELECT o.id, o.source_id, o.document_version_id, o.audience, o.kind, o.title, o.summary, o.action_label, o.action_url, o.deadline, o.requirements_json, snap.retrieved_at FROM opportunities o JOIN document_versions d ON d.id = o.document_version_id JOIN snapshots snap ON snap.id = d.snapshot_id WHERE o.audience = ? ORDER BY snap.retrieved_at DESC, o.title ASC LIMIT 36")
+    .bind(profile.audience)
+    .all<Record<string, unknown>>();
+  const sourceMap = new Map(officialSourceRegistry.map((source) => [source.id, source]));
+  const base = demoProfiles[profile.audience];
+  const effectiveProfile = { ...base, ...profile, facts: { ...base.facts, ...profile.facts } };
+  return result.results.flatMap((row) => {
+    const sourceId = typeof row.source_id === "string" ? row.source_id : "";
+    const source = sourceMap.get(sourceId);
+    const kind = typeof row.kind === "string" && opportunityKinds.has(row.kind as Opportunity["kind"]) ? row.kind as Opportunity["kind"] : null;
+    const retrievedAt = typeof row.retrieved_at === "string" ? row.retrieved_at : null;
+    if (!source || !kind || !retrievedAt || typeof row.id !== "string" || typeof row.document_version_id !== "string" || typeof row.title !== "string" || typeof row.summary !== "string" || typeof row.action_label !== "string" || typeof row.action_url !== "string") return [];
+    const opportunity: Opportunity = {
+      id: row.id,
+      sourceId,
+      documentVersionId: row.document_version_id,
+      audience: profile.audience,
+      kind,
+      title: row.title,
+      summary: row.summary,
+      actionLabel: row.action_label,
+      actionUrl: row.action_url,
+      deadline: typeof row.deadline === "string" ? row.deadline : undefined,
+      requirements: parseRequirements(row.requirements_json)
+    };
+    return createActions([opportunity], effectiveProfile, new Map([[sourceId, source]]), retrievedAt);
+  });
 }
 
 function fixtureChunks(catalog: Awaited<ReturnType<typeof buildDemoCatalog>>): DocumentChunk[] {
@@ -130,6 +181,12 @@ export default {
         })),
         notice: "Candidates are leads from trusted public pages. They are not monitored sources until a human verifies authority, access rules, and usefulness."
       });
+    }
+    if (request.method === "GET" && url.pathname === "/v1/actions") {
+      const audience = url.searchParams.get("audience");
+      if (audience !== "business" && audience !== "student" && audience !== "citizen") return json({ error: "Provide a recognised audience." }, { status: 400 });
+      const actions = await liveActionsForProfile(_env.DB, { id: `public-${audience}`, label: `Public ${audience} context`, audience, facts: {} });
+      return json({ actions, mode: "live_resource_leads", informationalNotice: "These are leads from official resources already discovered by monitored sources. They are not eligibility determinations; confirm all criteria and deadlines on the linked official page." });
     }
     if (request.method === "GET" && url.pathname === "/v1/resources") {
       if (!_env.DB) return json({ resources: [], mode: "unconfigured", notice: "Official resource links appear after live source collection is configured." });
@@ -285,8 +342,10 @@ export default {
     if (request.method === "POST" && url.pathname === "/v1/match") {
       const body: unknown = await request.json().catch(() => null);
       if (!isProfile(body)) return json({ error: "Provide id, label, audience, and facts." }, { status: 400 });
+      const liveActions = await liveActionsForProfile(_env.DB, body);
+      if (liveActions.length > 0) return json({ profile: body, actions: liveActions, mode: "live_resource_leads", informationalNotice: "Results are informational leads, not eligibility decisions. Confirm official criteria, deadlines, and source terms before acting." });
       const actions = actionsForProfile(body, catalog);
-      return json({ profile: body, actions, informationalNotice: "Results are informational. Check official eligibility and source terms before acting." });
+      return json({ profile: body, actions, mode: "fixture_fallback", informationalNotice: "Results are informational. Check official eligibility and source terms before acting." });
     }
     return json({ error: "Not found" }, { status: 404 });
   },

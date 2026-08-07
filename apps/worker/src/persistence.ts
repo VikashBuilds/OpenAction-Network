@@ -1,4 +1,4 @@
-import { compareDocumentVersions, type DocumentChange, type DocumentVersion, type IngestResult, type Source } from "@openaction/core";
+import { buildResourceLeadOpportunities, compareDocumentVersions, type DocumentChange, type DocumentVersion, type IngestResult, type Opportunity, type Source } from "@openaction/core";
 import type { IngestionRun } from "./ingestion";
 import type { AgentFinding } from "./agents";
 
@@ -57,6 +57,7 @@ export async function persistIngest(bindings: EvidenceBindings, source: Source, 
     bindings.DB.prepare("INSERT OR REPLACE INTO snapshots (id, source_id, retrieved_at, content_hash, storage_key, status, error) VALUES (?, ?, ?, ?, ?, ?, ?)")
       .bind(result.snapshot.id, result.snapshot.sourceId, result.snapshot.retrievedAt, result.snapshot.contentHash, result.snapshot.storageKey, result.snapshot.status, result.snapshot.error ?? null),
     ...result.documents.map((document) => documentStatement(bindings.DB!, document)),
+    ...buildResourceLeadOpportunities(source, result.documents).map((opportunity) => opportunityStatement(bindings.DB!, opportunity)),
     ...result.changes.map((change) => changeStatement(bindings.DB!, change))
   ];
   await bindings.DB.batch(statements);
@@ -96,6 +97,11 @@ export async function persistAgentFinding(bindings: EvidenceBindings, finding: A
 function documentStatement(db: D1Database, document: DocumentVersion): D1PreparedStatement {
   return db.prepare("INSERT OR REPLACE INTO document_versions (id, source_id, snapshot_id, external_id, title, body, canonical_url, version_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
     .bind(document.id, document.sourceId, document.snapshotId, document.externalId, document.title, document.body, document.canonicalUrl, document.versionHash);
+}
+
+function opportunityStatement(db: D1Database, opportunity: Opportunity): D1PreparedStatement {
+  return db.prepare("INSERT INTO opportunities (id, source_id, document_version_id, audience, kind, title, summary, action_label, action_url, deadline, requirements_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET document_version_id = excluded.document_version_id, kind = excluded.kind, title = excluded.title, summary = excluded.summary, action_label = excluded.action_label, action_url = excluded.action_url, deadline = excluded.deadline, requirements_json = excluded.requirements_json")
+    .bind(opportunity.id, opportunity.sourceId, opportunity.documentVersionId, opportunity.audience, opportunity.kind, opportunity.title, opportunity.summary, opportunity.actionLabel, opportunity.actionUrl, opportunity.deadline ?? null, JSON.stringify(opportunity.requirements));
 }
 
 function changeStatement(db: D1Database, change: IngestResult["changes"][number]): D1PreparedStatement {

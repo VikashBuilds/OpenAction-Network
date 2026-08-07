@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EvidenceStore, LocalEvidenceRetriever, activeAgentAssignments, answerFromEvidence, assessSourceCandidate, chunkDocument, createOfficialPageCollector, discoverOfficialResources, extractOfficialText, matchOpportunity, normalizeUrl, officialSourceRegistry, toEvidenceVectors, validateSource } from "./index";
+import { EvidenceStore, LocalEvidenceRetriever, activeAgentAssignments, answerFromEvidence, assessSourceCandidate, buildResourceLeadOpportunities, chunkDocument, createOfficialPageCollector, discoverOfficialResources, extractOfficialText, matchOpportunity, normalizeUrl, officialSourceRegistry, toEvidenceVectors, validateSource } from "./index";
 import { buildDemoCatalog, demoProfiles } from "./fixtures";
 import type { Collector, Opportunity, Source } from "./index";
 
@@ -73,6 +73,15 @@ describe("evidence pipeline", () => {
     expect(resources).toHaveLength(1);
     expect(resources[0]?.title).toBe("Startup Seed Fund Scheme");
     expect(resources[0]?.canonicalUrl).toBe("https://example.gov.in/seed-fund");
+  });
+
+  it("turns collected official resource links into cautious, source-backed leads", () => {
+    const leads = buildResourceLeadOpportunities(source, [{
+      id: "document-resource", sourceId: source.id, snapshotId: "snapshot-resource", externalId: "resource:/seed-fund", title: "Startup Seed Fund Scheme", body: "Official resource", canonicalUrl: "https://example.gov.in/seed-fund", versionHash: "resource-hash"
+    }]);
+    expect(leads).toHaveLength(1);
+    expect(leads[0]).toMatchObject({ sourceId: source.id, audience: "business", actionUrl: "https://example.gov.in/seed-fund", kind: "scheme" });
+    expect(matchOpportunity(leads[0]!, demoProfiles.business).status).toBe("possibly_eligible");
   });
 
   it("keeps AI-discovered candidates outside the collector allow-list until review", () => {
