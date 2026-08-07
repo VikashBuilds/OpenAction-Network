@@ -15,6 +15,10 @@ concurrency:
 jobs:
   discover-candidates:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        seedSourceId: [startup-india, ncs, india-gov-spotlight, education-loans]
     env:
       OPENACTION_INGEST_URL: ${{ secrets.OPENACTION_INGEST_URL }}
       OPENACTION_GITHUB_INGEST_TOKEN: ${{ secrets.OPENACTION_GITHUB_INGEST_TOKEN }}
@@ -30,4 +34,4 @@ jobs:
             -X POST "$OPENACTION_INGEST_URL/v1/agents/github/scout" \
             -H "Authorization: Bearer $OPENACTION_GITHUB_INGEST_TOKEN" \
             -H "Content-Type: application/json" \
-            --data '{"agentId":"source-verifier","seedSourceId":"india-gov-spotlight"}'
+            --data '{"agentId":"source-verifier","seedSourceId":"${{ matrix.seedSourceId }}"}'
