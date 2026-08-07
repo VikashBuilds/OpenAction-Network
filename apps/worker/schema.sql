@@ -115,3 +115,18 @@ CREATE TABLE IF NOT EXISTS feedback_reports (
 );
 
 CREATE INDEX IF NOT EXISTS feedback_reports_review_queue ON feedback_reports(status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS agent_findings (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL,
+  source_id TEXT NOT NULL REFERENCES sources(id),
+  source_name TEXT NOT NULL,
+  document_version_ids_json TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  signals_json TEXT NOT NULL,
+  model TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS agent_findings_source_content ON agent_findings(source_id, content_hash);
+CREATE INDEX IF NOT EXISTS agent_findings_recent ON agent_findings(created_at DESC);

@@ -31,7 +31,8 @@
   ],
   "ai": { "binding": "AI" },
   "vars": {
-    "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5"
+    "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5",
+    "AGENT_REASONING_MODEL": "@cf/meta/llama-3.1-8b-instruct-fast"
   },
   "workflows": [
     { "binding": "INGEST_WORKFLOW", "name": "openaction-ingest", "class_name": "OpenActionIngestWorkflow" }

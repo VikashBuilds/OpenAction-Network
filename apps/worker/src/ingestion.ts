@@ -6,6 +6,7 @@ export interface IngestJob {
   sourceId: string;
   requestedAt: string;
   reason: IngestReason;
+  agentId?: string;
 }
 
 export interface IngestionRun {
@@ -22,8 +23,8 @@ export interface IngestionRun {
   changeCount?: number;
 }
 
-export function createIngestJob(source: Source, reason: IngestReason, now = new Date()): IngestJob {
-  return { sourceId: source.id, requestedAt: now.toISOString(), reason };
+export function createIngestJob(source: Source, reason: IngestReason, now = new Date(), agentId?: string): IngestJob {
+  return { sourceId: source.id, requestedAt: now.toISOString(), reason, agentId };
 }
 
 export function runId(job: IngestJob): string {

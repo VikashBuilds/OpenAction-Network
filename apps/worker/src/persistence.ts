@@ -1,5 +1,6 @@
 import { compareDocumentVersions, type DocumentChange, type DocumentVersion, type IngestResult, type Source } from "@openaction/core";
 import type { IngestionRun } from "./ingestion";
+import type { AgentFinding } from "./agents";
 
 export interface EvidenceBindings {
   DB?: D1Database;
@@ -75,6 +76,21 @@ export async function decideReview(bindings: EvidenceBindings, changeId: string,
     .bind(decision, reviewer, note ?? null, new Date().toISOString(), changeId)
     .run();
   return (result.meta.changes ?? 0) === 1;
+}
+
+export async function hasAgentFindingForContent(bindings: EvidenceBindings, sourceId: string, contentHash: string): Promise<boolean> {
+  if (!bindings.DB) return false;
+  const finding = await bindings.DB.prepare("SELECT id FROM agent_findings WHERE source_id = ? AND content_hash = ? LIMIT 1")
+    .bind(sourceId, contentHash)
+    .first<{ id: string }>();
+  return Boolean(finding);
+}
+
+export async function persistAgentFinding(bindings: EvidenceBindings, finding: AgentFinding): Promise<void> {
+  if (!bindings.DB) return;
+  await bindings.DB.prepare("INSERT OR IGNORE INTO agent_findings (id, agent_id, source_id, source_name, document_version_ids_json, content_hash, signals_json, model, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(finding.id, finding.agentId, finding.sourceId, finding.sourceName, JSON.stringify(finding.documentVersionIds), finding.contentHash, JSON.stringify(finding.signals), finding.model, finding.createdAt)
+    .run();
 }
 
 function documentStatement(db: D1Database, document: DocumentVersion): D1PreparedStatement {

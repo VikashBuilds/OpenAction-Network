@@ -11,6 +11,7 @@ interface Env extends EvidenceBindings, RagBindings {
   INGEST_WORKFLOW?: Workflow<IngestJob>;
   INGEST_TRIGGER_TOKEN?: string;
   GITHUB_INGEST_TOKEN?: string;
+  AGENT_REASONING_MODEL?: string;
   ADMIN_TOKEN?: string;
 }
 
@@ -88,6 +89,27 @@ export default {
       activeAssignments: activeAgentAssignments(officialSourceRegistry).map(({ agent, source }) => ({ agentId: agent.id, sourceId: source.id, sourceName: source.name })),
       policy: "Agents may discover and assess candidates, but cannot add collectors, create unsourced actions, or publish eligibility decisions."
     });
+    if (request.method === "GET" && url.pathname === "/v1/agent-findings") {
+      if (!_env.DB) return json({ findings: [], mode: "unconfigured" });
+      const audience = url.searchParams.get("audience");
+      const statement = audience
+        ? _env.DB.prepare("SELECT f.id, f.agent_id, f.source_id, f.source_name, f.document_version_ids_json, f.signals_json, f.created_at, s.publisher, s.canonical_url FROM agent_findings f JOIN sources s ON s.id = f.source_id WHERE s.audience_json LIKE ? AND NOT EXISTS (SELECT 1 FROM agent_findings newer WHERE newer.source_id = f.source_id AND newer.created_at > f.created_at) ORDER BY f.created_at DESC LIMIT 24").bind(`%${audience}%`)
+        : _env.DB.prepare("SELECT f.id, f.agent_id, f.source_id, f.source_name, f.document_version_ids_json, f.signals_json, f.created_at, s.publisher, s.canonical_url FROM agent_findings f JOIN sources s ON s.id = f.source_id WHERE NOT EXISTS (SELECT 1 FROM agent_findings newer WHERE newer.source_id = f.source_id AND newer.created_at > f.created_at) ORDER BY f.created_at DESC LIMIT 24");
+      const result = await statement.all<Record<string, unknown>>();
+      const findings = result.results.map((finding) => ({
+        id: finding.id,
+        agentId: finding.agent_id,
+        sourceId: finding.source_id,
+        sourceName: finding.source_name,
+        publisher: finding.publisher,
+        canonicalUrl: finding.canonical_url,
+        documentVersionIds: parseJsonArray(finding.document_version_ids_json),
+        signals: parseSignals(finding.signals_json),
+        createdAt: finding.created_at,
+        notice: "AI-selected signals are shown only with exact excerpts from collected official source material. They are informational, not eligibility or legal decisions."
+      }));
+      return json({ findings, mode: "live" });
+    }
     if (request.method === "GET" && url.pathname === "/v1/resources") {
       if (!_env.DB) return json({ resources: [], mode: "unconfigured", notice: "Official resource links appear after live source collection is configured." });
       const audience = url.searchParams.get("audience");
@@ -216,7 +238,7 @@ export default {
       const source = officialSourceRegistry.find((candidate) => candidate.id === body?.sourceId);
       const agent = agentMeshRoster.find((candidate) => candidate.id === body?.agentId);
       if (!source || !agent || !agent.approvedSourceIds.includes(source.id)) return json({ error: "Provide an approved agentId and sourceId assignment." }, { status: 400 });
-      const job = createIngestJob(source, "github_actions");
+      const job = createIngestJob(source, "github_actions", new Date(), agent.id);
       if (_env.INGEST_QUEUE) await _env.INGEST_QUEUE.send(job);
       else if (_env.INGEST_WORKFLOW) await _env.INGEST_WORKFLOW.create({ params: job });
       else return json({ error: "No ingestion Queue or Workflow binding is configured." }, { status: 503 });
@@ -259,6 +281,21 @@ function parseJsonArray(value: unknown): string[] {
   try {
     const parsed: unknown = JSON.parse(value);
     return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseSignals(value: unknown): Array<{ title: string; evidence: string }> {
+  if (typeof value !== "string") return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const signal = item as { title?: unknown; evidence?: unknown };
+      return typeof signal.title === "string" && typeof signal.evidence === "string" ? [{ title: signal.title, evidence: signal.evidence }] : [];
+    });
   } catch {
     return [];
   }
