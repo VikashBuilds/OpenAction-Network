@@ -1,0 +1,33 @@
+name: OpenAction source scout
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "33 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openaction-source-scout
+  cancel-in-progress: false
+
+jobs:
+  discover-candidates:
+    runs-on: ubuntu-latest
+    env:
+      OPENACTION_INGEST_URL: ${{ secrets.OPENACTION_INGEST_URL }}
+      OPENACTION_GITHUB_INGEST_TOKEN: ${{ secrets.OPENACTION_GITHUB_INGEST_TOKEN }}
+    steps:
+      - name: Require Cloudflare source-scout configuration
+        if: ${{ env.OPENACTION_INGEST_URL == '' || env.OPENACTION_GITHUB_INGEST_TOKEN == '' }}
+        run: |
+          echo "Set OPENACTION_INGEST_URL and OPENACTION_GITHUB_INGEST_TOKEN as repository Actions secrets."
+          exit 1
+      - name: Ask the verifier agent to discover candidate official sources
+        run: |
+          curl --fail-with-body --retry 3 --retry-all-errors --connect-timeout 15 --max-time 60 \
+            -X POST "$OPENACTION_INGEST_URL/v1/agents/github/scout" \
+            -H "Authorization: Bearer $OPENACTION_GITHUB_INGEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"agentId":"source-verifier","seedSourceId":"india-gov-spotlight"}'

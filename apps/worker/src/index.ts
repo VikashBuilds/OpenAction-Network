@@ -5,6 +5,7 @@ import type { RagBindings } from "./vectorize";
 import { createIngestJob, type IngestJob } from "./ingestion";
 import { OpenActionIngestWorkflow, scheduledJobs } from "./workflow";
 import { retrieveSemanticEvidence } from "./semantic";
+import { discoverSourceCandidates } from "./source-scout";
 
 interface Env extends EvidenceBindings, RagBindings {
   INGEST_QUEUE?: Queue<IngestJob>;
@@ -109,6 +110,26 @@ export default {
         notice: "AI-selected signals are shown only with exact excerpts from collected official source material. They are informational, not eligibility or legal decisions."
       }));
       return json({ findings, mode: "live" });
+    }
+    if (request.method === "GET" && url.pathname === "/v1/source-candidates") {
+      if (!_env.DB) return json({ candidates: [], mode: "unconfigured" });
+      const result = await _env.DB.prepare("SELECT id, agent_id, discovered_from_source_id, canonical_url, name, evidence_excerpt, host, score, review_reason, status, created_at FROM source_candidates WHERE status = 'pending_review' ORDER BY score DESC, created_at DESC LIMIT 50").all<Record<string, unknown>>();
+      return json({
+        candidates: result.results.map((candidate) => ({
+          id: candidate.id,
+          agentId: candidate.agent_id,
+          discoveredFromSourceId: candidate.discovered_from_source_id,
+          canonicalUrl: candidate.canonical_url,
+          name: candidate.name,
+          evidenceExcerpt: candidate.evidence_excerpt,
+          host: candidate.host,
+          score: candidate.score,
+          reviewReason: candidate.review_reason,
+          status: candidate.status,
+          createdAt: candidate.created_at
+        })),
+        notice: "Candidates are leads from trusted public pages. They are not monitored sources until a human verifies authority, access rules, and usefulness."
+      });
     }
     if (request.method === "GET" && url.pathname === "/v1/resources") {
       if (!_env.DB) return json({ resources: [], mode: "unconfigured", notice: "Official resource links appear after live source collection is configured." });
@@ -243,6 +264,23 @@ export default {
       else if (_env.INGEST_WORKFLOW) await _env.INGEST_WORKFLOW.create({ params: job });
       else return json({ error: "No ingestion Queue or Workflow binding is configured." }, { status: 503 });
       return json({ accepted: true, agentId: agent.id, job, notice: "GitHub requested collection; Cloudflare performs the allow-listed fetch, snapshot, validation, and indexing." });
+    }
+    if (request.method === "POST" && url.pathname === "/v1/agents/github/scout") {
+      if (!hasBearerToken(request, _env.GITHUB_INGEST_TOKEN)) return json({ error: "GitHub source scouting is not configured." }, { status: 401 });
+      const body = await request.json().catch(() => null) as { agentId?: string; seedSourceId?: string } | null;
+      const agent = agentMeshRoster.find((candidate) => candidate.id === body?.agentId);
+      const seedSource = officialSourceRegistry.find((candidate) => candidate.id === body?.seedSourceId);
+      if (!agent || !seedSource || !agent.capabilities.includes("discover")) return json({ error: "Provide a discovery-capable agentId and registered seedSourceId." }, { status: 400 });
+      try {
+        const candidates = await discoverSourceCandidates({
+          DB: _env.DB,
+          AI: _env.AI as unknown as import("./agents").AgentReasoningBinding | undefined,
+          AGENT_REASONING_MODEL: _env.AGENT_REASONING_MODEL
+        }, agent, seedSource);
+        return json({ accepted: true, agentId: agent.id, seedSourceId: seedSource.id, candidateCount: candidates.length, candidates: candidates.map((candidate) => ({ name: candidate.name, host: candidate.host, score: candidate.score })) });
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "Source scout failed." }, { status: 502 });
+      }
     }
     if (request.method === "POST" && url.pathname === "/v1/match") {
       const body: unknown = await request.json().catch(() => null);

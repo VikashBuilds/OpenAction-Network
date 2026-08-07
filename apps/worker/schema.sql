@@ -130,3 +130,19 @@ CREATE TABLE IF NOT EXISTS agent_findings (
 
 CREATE INDEX IF NOT EXISTS agent_findings_source_content ON agent_findings(source_id, content_hash);
 CREATE INDEX IF NOT EXISTS agent_findings_recent ON agent_findings(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS source_candidates (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL,
+  discovered_from_source_id TEXT NOT NULL REFERENCES sources(id),
+  canonical_url TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  evidence_excerpt TEXT NOT NULL,
+  host TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  review_reason TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending_review', 'approved', 'rejected')) DEFAULT 'pending_review',
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS source_candidates_review_queue ON source_candidates(status, score DESC, created_at DESC);
