@@ -61,6 +61,19 @@ interface AgentFinding {
   notice: string;
 }
 
+interface SourceCandidate {
+  id: string;
+  agentId: string;
+  discoveredFromSourceId: string;
+  canonicalUrl: string;
+  name: string;
+  evidenceExcerpt: string;
+  host: string;
+  score: number;
+  reviewReason: string;
+  createdAt: string;
+}
+
 function loadProfile(): Profile {
   try {
     const saved = localStorage.getItem(storageKey);
@@ -86,6 +99,8 @@ export function App() {
   const [resourceError, setResourceError] = useState("");
   const [agentFindings, setAgentFindings] = useState<AgentFinding[] | null>(null);
   const [agentFindingsError, setAgentFindingsError] = useState("");
+  const [sourceCandidates, setSourceCandidates] = useState<SourceCandidate[] | null>(null);
+  const [sourceCandidatesError, setSourceCandidatesError] = useState("");
   const [reportSource, setReportSource] = useState<SourceHealth | null>(null);
 
   useEffect(() => { void buildDemoCatalog().then(setCatalog); }, []);
@@ -121,6 +136,21 @@ export function App() {
       });
     return () => controller.abort();
   }, [profile.audience]);
+  useEffect(() => {
+    if (!apiBaseUrl) return;
+    const controller = new AbortController();
+    void fetch(`${apiBaseUrl}/v1/source-candidates`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The source discovery queue is unavailable.");
+        return response.json() as Promise<{ candidates?: SourceCandidate[] }>;
+      })
+      .then((payload) => setSourceCandidates(payload.candidates ?? []))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setSourceCandidatesError("The source discovery queue could not be loaded right now.");
+      });
+    return () => controller.abort();
+  }, []);
   useEffect(() => {
     if (!apiBaseUrl) return;
     const controller = new AbortController();
@@ -237,6 +267,10 @@ export function App() {
       <section className="agent-desk" aria-labelledby="agent-desk-title">
         <div className="agent-desk-heading"><div><p className="eyebrow">AI EVIDENCE DESK</p><h2 id="agent-desk-title">What the agents found in official material.</h2><p>Every displayed signal includes an exact excerpt from a collected source. These are discovery cues, never automatic eligibility decisions.</p></div><span>{agentFindings === null ? "ANALYSING" : `${agentFindings.length} AGENT REPORTS`}</span></div>
         {agentFindings === null ? <div className="agent-desk-empty">{agentFindingsError || "Checking the latest source-grounded agent reportsâ€¦"}</div> : agentFindings.length === 0 ? <div className="agent-desk-empty">No validated AI evidence signals are available for this context yet.</div> : <div className="agent-report-list">{agentFindings.slice(0, 6).map((finding) => <article key={finding.id} className="agent-report"><div><span>{finding.agentId.replaceAll("-", " ")}</span><a href={finding.canonicalUrl} target="_blank" rel="noreferrer">{finding.sourceName} â†—</a></div>{finding.signals.slice(0, 3).map((signal) => <section key={`${finding.id}-${signal.evidence}`}><h3>{signal.title}</h3><blockquote>â€œ{signal.evidence}â€</blockquote></section>)}<small>Analysed {new Date(finding.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</small></article>)}</div>}
+      </section>
+      <section className="source-frontier" aria-labelledby="source-frontier-title">
+        <div className="source-frontier-heading"><div><p className="eyebrow">SOURCE FRONTIER</p><h2 id="source-frontier-title">New official-source leads, held for review.</h2><p>The scout finds public-domain candidates from trusted sources. Nothing is automatically scraped or published from this queue.</p></div><span>{sourceCandidates === null ? "SCOUTING" : `${sourceCandidates.length} LEADS`}</span></div>
+        {sourceCandidates === null ? <div className="source-frontier-empty">{sourceCandidatesError || "Loading the source-scout review queueâ€¦"}</div> : sourceCandidates.length === 0 ? <div className="source-frontier-empty">No new source candidates are waiting for review.</div> : <div className="source-frontier-list">{sourceCandidates.slice(0, 8).map((candidate) => <article key={candidate.id} className="source-candidate"><div><span>{candidate.score}/100 RELEVANCE</span><small>Found by {candidate.agentId.replaceAll("-", " ")}</small></div><h3>{candidate.name}</h3><p>{candidate.host}</p><a href={candidate.canonicalUrl} target="_blank" rel="noreferrer">Inspect candidate source â†—</a><small className="candidate-review">Awaiting authority, terms, and access review</small></article>)}</div>}
       </section>
       <div className="action-grid">
         {actions.length ? actions.map((action) => <ActionCard key={action.id} action={action} />) : <div className="empty"><h3>No verified actions yet</h3><p>Try a different profile context while more source connectors are added.</p></div>}
